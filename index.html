@@ -30,28 +30,16 @@
       object-fit: cover;
     }
 
-    /* YouTube rádió – teljesen rejtve, csak hang */
-    #yt-radio {
-      position: fixed;
-      width: 1px;
-      height: 1px;
-      bottom: 0;
-      right: 0;
-      opacity: 0;
-      pointer-events: none;
-      z-index: -1;
-    }
-
     .overlay {
       position: fixed;
       inset: 0;
       z-index: 1;
       background: linear-gradient(
         to bottom,
-        rgba(20, 8, 0, 0.25) 0%,
-        rgba(20, 8, 0, 0.0) 40%,
-        rgba(20, 8, 0, 0.0) 60%,
-        rgba(20, 8, 0, 0.55) 100%
+        rgba(20,8,0,0.25) 0%,
+        rgba(20,8,0,0.0) 40%,
+        rgba(20,8,0,0.0) 60%,
+        rgba(20,8,0,0.55) 100%
       );
       pointer-events: none;
     }
@@ -91,8 +79,8 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      background: rgba(20, 8, 0, 0.55);
-      border: 1px solid rgba(212, 169, 106, 0.35);
+      background: rgba(20,8,0,0.55);
+      border: 1px solid rgba(212,169,106,0.35);
       border-radius: 40px;
       padding: 8px 18px;
       backdrop-filter: blur(8px);
@@ -156,12 +144,12 @@
       letter-spacing: 0.5em;
     }
 
-    /* Indítás gomb – első kattintáshoz kell */
+    /* Indítás overlay */
     #start-overlay {
       position: fixed;
       inset: 0;
       z-index: 100;
-      background: rgba(26,10,0,0.85);
+      background: rgba(26,10,0,0.92);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -196,31 +184,50 @@
       cursor: pointer;
       letter-spacing: 0.1em;
     }
+
+    /* Rejtett reklám kihagyása gomb – jobb felső sarok */
+    #skip-btn {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 50;
+      background: rgba(20,8,0,0.01);
+      border: none;
+      color: rgba(255,255,255,0.01);
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 0;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    /* Ha valaki 3x gyorsan nyomja, megmutatja magát */
+    #skip-btn.visible {
+      background: rgba(212,169,106,0.85);
+      color: #1a0a00;
+      font-size: 0.7rem;
+      font-family: 'Lato', sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
   </style>
 </head>
 <body>
 
-  <!-- Indítás overlay (böngésző autoplay policy miatt kell 1 kattintás) -->
+  <!-- Indítás overlay -->
   <div id="start-overlay" onclick="startAll()">
     <h1>Godó Cukrászda</h1>
     <p>Tandi Cuki</p>
     <button id="start-btn">▶ &nbsp; Indítás</button>
   </div>
 
-  <!-- VIDEÓ (Cloudinary) -->
+  <!-- VIDEÓ -->
   <div id="video-container">
-    <video id="main-video" muted playsinline loop>
+    <video id="main-video" playsinline loop>
       <source src="https://res.cloudinary.com/dekyvz2kj/video/upload/v1781293765/Godo_Cukraszda_Bemutato1_uf6vhy.mp4" type="video/mp4">
     </video>
   </div>
-
-  <!-- RÁDIÓ 1 YouTube Live – rejtve, csak hang -->
-  <iframe
-    id="yt-radio"
-    src=""
-    allow="autoplay"
-    allowfullscreen>
-  </iframe>
 
   <div class="overlay"></div>
   <div class="corner-deco">✦ &nbsp; ✦ &nbsp; ✦</div>
@@ -232,7 +239,7 @@
     </div>
     <div class="radio-badge">
       <div class="radio-dot"></div>
-      <span class="radio-label">Radio 1 – Élő adás</span>
+      <span class="radio-label" id="radio-label">Radio 1 – Élő adás</span>
     </div>
   </div>
 
@@ -240,6 +247,12 @@
     <div class="tagline">Minden falat egy kis boldogság.</div>
     <div class="clock" id="clock">00:00</div>
   </div>
+
+  <!-- Rejtett reklám kihagyása gomb -->
+  <button id="skip-btn" onclick="skipAd()" title=""></button>
+
+  <!-- RÁDIÓ – közvetlen audio elem, több fallback URL -->
+  <audio id="radio" preload="none"></audio>
 
   <script>
     // ÓRA
@@ -252,19 +265,81 @@
     updateClock();
     setInterval(updateClock, 10000);
 
-    function startAll() {
-      // Overlay elrejtése
-      document.getElementById('start-overlay').style.display = 'none';
+    // RÁDIÓ stream URL-ek (sorban próbálja)
+    const streams = [
+      'https://stream.radio1.hu/radio1',
+      'https://radio1.hu/stream',
+      'https://edge.audio.niceshops.net/radio1',
+      'https://icecast.radio1.hu/radio1.mp3',
+    ];
+    let streamIdx = 0;
+    const audio = document.getElementById('radio');
+    audio.volume = 0.65;
 
-      // Videó indítása
-      const video = document.getElementById('main-video');
-      video.play();
-
-      // Radio 1 YouTube Live betöltése (hang + muted=0)
-      // Rádió 1 élő csatorna
-      document.getElementById('yt-radio').src =
-        'https://www.youtube.com/embed/live_stream?channel=UCwtPZLYmeerWoawWyoRiIBw&autoplay=1&mute=0&controls=0&disablekb=1&fs=0&modestbranding=1';
+    function tryStream() {
+      if (streamIdx >= streams.length) {
+        document.getElementById('radio-label').textContent = 'Rádió – nincs kapcsolat';
+        return;
+      }
+      audio.src = streams[streamIdx];
+      audio.load();
+      audio.play().catch(() => {
+        streamIdx++;
+        tryStream();
+      });
     }
+
+    // INDÍTÁS
+    function startAll() {
+      document.getElementById('start-overlay').style.display = 'none';
+      // Videó indítása – hang NÉLKÜL (muted=false de nincs hang a videóban)
+      const video = document.getElementById('main-video');
+      video.muted = true; // videónak nincs hangja, rádió adja a hangot
+      video.play();
+      // Rádió indítása
+      tryStream();
+    }
+
+    // REKLÁM KIHAGYÁS GOMB
+    // Rejtett gomb – ha megnyomják, újraindítja a stream-et (átugorja a reklámot)
+    let skipTaps = 0;
+    let skipTimer = null;
+    const skipBtn = document.getElementById('skip-btn');
+
+    skipBtn.addEventListener('click', function() {
+      skipTaps++;
+      clearTimeout(skipTimer);
+      if (skipTaps >= 2) {
+        skipBtn.classList.add('visible');
+        skipBtn.title = 'Reklám kihagyás';
+        skipBtn.style.fontSize = '0.65rem';
+        skipBtn.textContent = 'SKIP';
+      }
+      skipTimer = setTimeout(() => {
+        skipTaps = 0;
+      }, 2000);
+    });
+
+    function skipAd() {
+      // Rádió újraindítása = reklám kihagyása
+      audio.pause();
+      audio.currentTime = 0;
+      streamIdx = 0;
+      setTimeout(() => {
+        tryStream();
+      }, 500);
+    }
+
+    // Ha a rádió leáll (pl. reklám után), automatikusan újraindul
+    audio.addEventListener('ended', () => {
+      streamIdx = 0;
+      tryStream();
+    });
+
+    audio.addEventListener('error', () => {
+      streamIdx++;
+      tryStream();
+    });
   </script>
 
 </body>
