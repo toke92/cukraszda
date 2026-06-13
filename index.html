@@ -18,6 +18,7 @@
     .radio-area { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
     .radio-badge { display: flex; align-items: center; gap: 10px; background: rgba(20,8,0,0.6); border: 1px solid rgba(212,169,106,0.4); border-radius: 40px; padding: 8px 18px; }
     .radio-dot { width: 9px; height: 9px; border-radius: 50%; background: #d4a96a; animation: pulse 1.8s ease-in-out infinite; }
+    .radio-dot.error { background: #888; animation: none; }
     @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
     .radio-label { font-size: 0.78rem; font-weight: 300; letter-spacing: 0.15em; color: #f5e6c8; text-transform: uppercase; }
     #radio-select { background: rgba(20,8,0,0.7); border: 1px solid rgba(212,169,106,0.4); border-radius: 20px; color: #d4a96a; font-family: 'Lato', sans-serif; font-size: 0.75rem; padding: 6px 14px; cursor: pointer; outline: none; width: 100%; }
@@ -41,13 +42,10 @@
   </div>
 
   <div id="video-container">
-    <video id="main-video" playsinline loop preload="auto" volume="0">
+    <video id="main-video" playsinline loop preload="auto" muted>
       <source src="https://res.cloudinary.com/dekyvz2kj/video/upload/v1781293765/Godo_Cukraszda_Bemutato1_uf6vhy.mp4" type="video/mp4">
     </video>
   </div>
-
-  <!-- Rádió – egyszerű audio tag -->
-  <audio id="radio" preload="none" style="display:none"></audio>
 
   <div class="overlay"></div>
   <div class="corner-deco">✦ &nbsp; ✦ &nbsp; ✦</div>
@@ -59,7 +57,7 @@
     </div>
     <div class="radio-area">
       <div class="radio-badge">
-        <div class="radio-dot"></div>
+        <div class="radio-dot" id="radio-dot"></div>
         <span class="radio-label" id="radio-label">Rádió 1 – Élő adás</span>
       </div>
       <select id="radio-select" onchange="changeRadio(this.value, this.options[this.selectedIndex].text)">
@@ -80,6 +78,7 @@
   </div>
 
   <script>
+    // --- Óra ---
     function updateClock() {
       const now = new Date();
       const h = String(now.getHours()).padStart(2, '0');
@@ -89,40 +88,92 @@
     updateClock();
     setInterval(updateClock, 10000);
 
-    const audio = document.getElementById('radio');
-    audio.volume = 1.0;
+    // --- Web Audio API rádió ---
+    let audioCtx = null;
+    let sourceNode = null;
+    let currentUrl = 'https://icast.connectmedia.hu/5202/live.mp3';
+    let retryTimer = null;
+
+    function setDot(ok) {
+      const dot = document.getElementById('radio-dot');
+      dot.classList.toggle('error', !ok);
+    }
+
+    function startRadioWebAudio(url) {
+      // Ha már fut valami, leállítjuk
+      if (sourceNode) {
+        try { sourceNode.stop(); } catch(e) {}
+        sourceNode = null;
+      }
+      if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+
+      currentUrl = url;
+
+      // AudioContext létrehozása (vagy újrahasználása)
+      if (!audioCtx || audioCtx.state === 'closed') {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      // fetch + decodeAudioData módszer – ez a "nem audio tag" megközelítés
+      // Élő streamhez: Audio element + createMediaElementSource trükk
+      // Ez a legmegbízhatóbb Web Audio API + stream kombináció:
+      const audioEl = new Audio();
+      audioEl.crossOrigin = 'anonymous';
+      audioEl.src = url;
+      audioEl.preload = 'none';
+
+      try {
+        sourceNode = audioCtx.createMediaElementSource(audioEl);
+        sourceNode.connect(audioCtx.destination);
+      } catch(e) {
+        // Ha már van source hozzárendelve, közvetlen play fallback
+        audioEl.play().catch(() => {});
+        return;
+      }
+
+      audioEl.play().then(() => {
+        setDot(true);
+      }).catch(() => {
+        setDot(false);
+        retryTimer = setTimeout(() => startRadioWebAudio(currentUrl), 5000);
+      });
+
+      audioEl.addEventListener('error', () => {
+        setDot(false);
+        retryTimer = setTimeout(() => startRadioWebAudio(currentUrl), 5000);
+      });
+
+      audioEl.addEventListener('playing', () => setDot(true));
+      audioEl.addEventListener('waiting', () => setDot(false));
+      audioEl.addEventListener('stalled', () => {
+        setDot(false);
+        retryTimer = setTimeout(() => startRadioWebAudio(currentUrl), 5000);
+      });
+
+      // Referencia tárolása a leállításhoz
+      sourceNode._audioEl = audioEl;
+    }
 
     function changeRadio(url, name) {
       const cleanName = name.replace('🎵 ', '');
       document.getElementById('radio-label').textContent = cleanName + ' – Élő adás';
-      audio.pause();
-      audio.src = url;
-      audio.load();
-      audio.play().catch(() => {});
+      startRadioWebAudio(url);
     }
 
     function startAll() {
       document.getElementById('start-overlay').style.display = 'none';
 
-      // Videó indítása – volume=0 (nincs hang a fájlban úgyis)
+      // Videó – muted, így a TV biztosan elindítja
       const video = document.getElementById('main-video');
-      video.volume = 0;
-      video.play().catch(() => {
-        video.muted = true;
-        video.play();
-      });
+      video.muted = true;
+      video.play().catch(() => {});
 
-      // Rádió indítása – ugyanabban a pillanatban, külön audio elem
-      audio.src = 'https://icast.connectmedia.hu/5202/live.mp3';
-      audio.load();
-      audio.play().catch(() => {});
+      // Rádió – Web Audio API-n keresztül, NEM <audio> tag
+      startRadioWebAudio(currentUrl);
     }
-
-    // Ha a rádió megszakad, újraindítja
-    audio.addEventListener('ended', () => { audio.play(); });
-    audio.addEventListener('error', () => {
-      setTimeout(() => { audio.load(); audio.play().catch(() => {}); }, 4000);
-    });
   </script>
 
 </body>
