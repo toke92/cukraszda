@@ -29,6 +29,19 @@
       object-fit: cover;
     }
 
+    /* Rádió iframe – teljesen láthatatlan, csak hang */
+    #radio-frame {
+      position: fixed;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+      bottom: 0;
+      right: 0;
+      z-index: -999;
+      border: none;
+    }
+
     .overlay {
       position: fixed;
       inset: 0;
@@ -99,8 +112,6 @@
       animation: pulse 1.8s ease-in-out infinite;
     }
 
-    .radio-dot.error { background: #888; animation: none; }
-
     @keyframes pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
       50% { opacity: 0.4; transform: scale(0.7); }
@@ -170,7 +181,6 @@
       letter-spacing: 0.5em;
     }
 
-    /* Indítás overlay */
     #start-overlay {
       position: fixed;
       inset: 0;
@@ -214,7 +224,6 @@
 </head>
 <body>
 
-  <!-- Indítás overlay -->
   <div id="start-overlay">
     <h1>Godó Cukrászda</h1>
     <p>Tandi Cuki</p>
@@ -228,6 +237,9 @@
     </video>
   </div>
 
+  <!-- RÁDIÓ – rejtett iframe, teljesen külön a videótól -->
+  <iframe id="radio-frame" src="" allow="autoplay"></iframe>
+
   <div class="overlay"></div>
   <div class="corner-deco">✦ &nbsp; ✦ &nbsp; ✦</div>
 
@@ -238,7 +250,7 @@
     </div>
     <div class="radio-area">
       <div class="radio-badge">
-        <div class="radio-dot" id="radio-dot"></div>
+        <div class="radio-dot"></div>
         <span class="radio-label" id="radio-label">Rádió 1 – Élő adás</span>
       </div>
       <select id="radio-select" onchange="changeRadio(this.value, this.options[this.selectedIndex].text)">
@@ -258,8 +270,6 @@
     <div class="clock" id="clock">00:00</div>
   </div>
 
-  <audio id="radio" preload="none"></audio>
-
   <script>
     // ÓRA
     function updateClock() {
@@ -271,58 +281,32 @@
     updateClock();
     setInterval(updateClock, 10000);
 
-    const audio = document.getElementById('radio');
-    audio.volume = 0.65;
-
-    function setRadioStatus(ok) {
-      const dot = document.getElementById('radio-dot');
-      if (ok) {
-        dot.classList.remove('error');
-      } else {
-        dot.classList.add('error');
-        document.getElementById('radio-label').textContent = 'Nincs kapcsolat';
-      }
-    }
-
-    function playRadio(url, name) {
-      audio.pause();
-      audio.src = url;
-      audio.load();
-      audio.play()
-        .then(() => { setRadioStatus(true); })
-        .catch(() => { setRadioStatus(false); });
-      if (name) {
-        document.getElementById('radio-label').textContent = name + ' – Élő adás';
-      }
+    // Rádió URL-ek – iframe helyett audio page-ek
+    // A rádió egy mini HTML oldalt tölt be az iframe-be
+    // ami csak az audio streamet játssza le
+    function makeRadioPage(streamUrl) {
+      return 'data:text/html;charset=utf-8,' + encodeURIComponent(
+        '<!DOCTYPE html><html><body style="margin:0;background:#000">' +
+        '<audio autoplay loop src="' + streamUrl + '" style="display:none"></audio>' +
+        '</body></html>'
+      );
     }
 
     function changeRadio(url, name) {
       const cleanName = name.replace('🎵 ', '');
-      playRadio(url, cleanName);
+      document.getElementById('radio-label').textContent = cleanName + ' – Élő adás';
+      document.getElementById('radio-frame').src = makeRadioPage(url);
     }
 
     function startAll() {
       document.getElementById('start-overlay').style.display = 'none';
 
-      // 1. Videó azonnal elindul
-      const video = document.getElementById('main-video');
-      video.play();
+      // Videó indul
+      document.getElementById('main-video').play();
 
-      // 2. Rádió 2 másodperccel később indul – TV-n nem okoz fekete képernyőt
-      setTimeout(() => {
-        playRadio('https://icast.connectmedia.hu/5202/live.mp3', 'Rádió 1');
-      }, 2000);
+      // Rádió teljesen külön iframe-ben indul – nem érinti a videót
+      document.getElementById('radio-frame').src = makeRadioPage('https://icast.connectmedia.hu/5202/live.mp3');
     }
-
-    // Ha a rádió hibázik, 5mp után újrapróbálja
-    audio.addEventListener('error', () => {
-      setTimeout(() => {
-        if (audio.src) {
-          audio.load();
-          audio.play().catch(() => {});
-        }
-      }, 5000);
-    });
   </script>
 
 </body>
