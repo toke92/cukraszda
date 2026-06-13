@@ -75,6 +75,14 @@
       text-shadow: 0 1px 6px rgba(0,0,0,0.7);
     }
 
+    /* RÁDIÓ BADGE + VÁLASZTÓ */
+    .radio-area {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+    }
+
     .radio-badge {
       display: flex;
       align-items: center;
@@ -104,6 +112,25 @@
       letter-spacing: 0.18em;
       color: #f5e6c8;
       text-transform: uppercase;
+    }
+
+    /* Legördülő rádióválasztó */
+    #radio-select {
+      background: rgba(20,8,0,0.7);
+      border: 1px solid rgba(212,169,106,0.4);
+      border-radius: 20px;
+      color: #d4a96a;
+      font-family: 'Lato', sans-serif;
+      font-size: 0.75rem;
+      padding: 5px 12px;
+      cursor: pointer;
+      outline: none;
+      letter-spacing: 0.08em;
+    }
+
+    #radio-select option {
+      background: #1a0a00;
+      color: #f5e6c8;
     }
 
     .bottom-bar {
@@ -184,33 +211,6 @@
       cursor: pointer;
       letter-spacing: 0.1em;
     }
-
-    /* Rejtett reklám kihagyása gomb – jobb felső sarok */
-    #skip-btn {
-      position: fixed;
-      top: 18px;
-      right: 18px;
-      z-index: 50;
-      background: rgba(20,8,0,0.01);
-      border: none;
-      color: rgba(255,255,255,0.01);
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      cursor: pointer;
-      font-size: 0;
-      transition: background 0.3s, color 0.3s;
-    }
-
-    /* Ha valaki 3x gyorsan nyomja, megmutatja magát */
-    #skip-btn.visible {
-      background: rgba(212,169,106,0.85);
-      color: #1a0a00;
-      font-size: 0.7rem;
-      font-family: 'Lato', sans-serif;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-    }
   </style>
 </head>
 <body>
@@ -224,7 +224,7 @@
 
   <!-- VIDEÓ -->
   <div id="video-container">
-    <video id="main-video" playsinline loop>
+    <video id="main-video" muted playsinline loop>
       <source src="https://res.cloudinary.com/dekyvz2kj/video/upload/v1781293765/Godo_Cukraszda_Bemutato1_uf6vhy.mp4" type="video/mp4">
     </video>
   </div>
@@ -237,9 +237,20 @@
       <span class="logo-main">Godó Cukrászda</span>
       <span class="logo-sub">Tandi Cuki</span>
     </div>
-    <div class="radio-badge">
-      <div class="radio-dot"></div>
-      <span class="radio-label" id="radio-label">Radio 1 – Élő adás</span>
+    <div class="radio-area">
+      <div class="radio-badge">
+        <div class="radio-dot"></div>
+        <span class="radio-label" id="radio-label">Rádió 1 – Élő adás</span>
+      </div>
+      <select id="radio-select" onchange="changeRadio(this.value, this.options[this.selectedIndex].text)">
+        <option value="https://icast.connectmedia.hu/5202/live.mp3">🎵 Rádió 1</option>
+        <option value="https://icast.connectmedia.hu/4736/live.mp3">🎵 Petőfi Rádió</option>
+        <option value="https://icast.connectmedia.hu/4738/live.mp3">🎵 Bartók Rádió</option>
+        <option value="https://icast.connectmedia.hu/4737/live.mp3">🎵 Kossuth Rádió</option>
+        <option value="https://stream.danko.hu/danko128.mp3">🎵 Dankó Rádió</option>
+        <option value="https://icast.connectmedia.hu/5102/live.mp3">🎵 Sláger FM</option>
+        <option value="https://stream.rox.hu/rox">🎵 Retro Rádió</option>
+      </select>
     </div>
   </div>
 
@@ -248,10 +259,6 @@
     <div class="clock" id="clock">00:00</div>
   </div>
 
-  <!-- Rejtett reklám kihagyása gomb -->
-  <button id="skip-btn" onclick="skipAd()" title=""></button>
-
-  <!-- RÁDIÓ – közvetlen audio elem, több fallback URL -->
   <audio id="radio" preload="none"></audio>
 
   <script>
@@ -265,80 +272,36 @@
     updateClock();
     setInterval(updateClock, 10000);
 
-    // RÁDIÓ stream URL-ek (sorban próbálja)
-    const streams = [
-      'https://stream.radio1.hu/radio1',
-      'https://radio1.hu/stream',
-      'https://edge.audio.niceshops.net/radio1',
-      'https://icecast.radio1.hu/radio1.mp3',
-    ];
-    let streamIdx = 0;
     const audio = document.getElementById('radio');
     audio.volume = 0.65;
 
-    function tryStream() {
-      if (streamIdx >= streams.length) {
-        document.getElementById('radio-label').textContent = 'Rádió – nincs kapcsolat';
-        return;
-      }
-      audio.src = streams[streamIdx];
+    function playRadio(url) {
+      audio.src = url;
       audio.load();
       audio.play().catch(() => {
-        streamIdx++;
-        tryStream();
+        // Ha nem sikerül, csendben marad
       });
     }
 
-    // INDÍTÁS
+    function changeRadio(url, name) {
+      const cleanName = name.replace('🎵 ', '');
+      document.getElementById('radio-label').textContent = cleanName + ' – Élő adás';
+      audio.pause();
+      playRadio(url);
+    }
+
     function startAll() {
       document.getElementById('start-overlay').style.display = 'none';
-      // Videó indítása – hang NÉLKÜL (muted=false de nincs hang a videóban)
-      const video = document.getElementById('main-video');
-      video.muted = true; // videónak nincs hangja, rádió adja a hangot
-      video.play();
-      // Rádió indítása
-      tryStream();
+      document.getElementById('main-video').play();
+      // Rádió 1 indítása alapból
+      playRadio('https://icast.connectmedia.hu/5202/live.mp3');
     }
-
-    // REKLÁM KIHAGYÁS GOMB
-    // Rejtett gomb – ha megnyomják, újraindítja a stream-et (átugorja a reklámot)
-    let skipTaps = 0;
-    let skipTimer = null;
-    const skipBtn = document.getElementById('skip-btn');
-
-    skipBtn.addEventListener('click', function() {
-      skipTaps++;
-      clearTimeout(skipTimer);
-      if (skipTaps >= 2) {
-        skipBtn.classList.add('visible');
-        skipBtn.title = 'Reklám kihagyás';
-        skipBtn.style.fontSize = '0.65rem';
-        skipBtn.textContent = 'SKIP';
-      }
-      skipTimer = setTimeout(() => {
-        skipTaps = 0;
-      }, 2000);
-    });
-
-    function skipAd() {
-      // Rádió újraindítása = reklám kihagyása
-      audio.pause();
-      audio.currentTime = 0;
-      streamIdx = 0;
-      setTimeout(() => {
-        tryStream();
-      }, 500);
-    }
-
-    // Ha a rádió leáll (pl. reklám után), automatikusan újraindul
-    audio.addEventListener('ended', () => {
-      streamIdx = 0;
-      tryStream();
-    });
 
     audio.addEventListener('error', () => {
-      streamIdx++;
-      tryStream();
+      setTimeout(() => {
+        audio.load();
+        audio.play().catch(() => {});
+      }, 3000);
     });
   </script>
 
