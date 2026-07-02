@@ -9,17 +9,16 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #1a0a00; font-family: 'Lato', sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
 
-    /* Videó – közvetlen Cloudinary embed link, iframe-ben */
-    #video-frame {
+    #main-video {
       position: fixed;
       inset: 0;
       width: 100%;
       height: 100%;
-      border: none;
+      object-fit: cover;
       z-index: 0;
     }
 
-    /* Rádió – myonlineradio.hu, teljesen láthatatlan */
+    /* Rádió – myonlineradio.hu iframe, teljesen láthatatlan */
     #radio-frame {
       position: fixed;
       width: 1px; height: 1px;
@@ -59,20 +58,13 @@
     <button id="start-btn" onclick="startAll()">&#9654; &nbsp; Indítás</button>
   </div>
 
-  <!-- Videó: Cloudinary saját embed lejátszója iframe-ben, loop=true&autoplay=true paraméterekkel -->
-  <iframe id="video-frame"
-    src="about:blank"
-    allowfullscreen
-    allow="autoplay; fullscreen"
-    scrolling="no">
-  </iframe>
+  <!-- Videó: közvetlen video tag, muted, loop -->
+  <video id="main-video" playsinline loop muted preload="auto">
+    <source src="https://res.cloudinary.com/dekyvz2kj/video/upload/v1781293765/Godo_Cukraszda_Bemutato1_uf6vhy.mp4" type="video/mp4">
+  </video>
 
   <!-- Rádió: myonlineradio.hu iframe-ben, láthatatlanul -->
-  <iframe id="radio-frame"
-    src="about:blank"
-    allow="autoplay"
-    scrolling="no">
-  </iframe>
+  <iframe id="radio-frame" src="about:blank" allow="autoplay" scrolling="no"></iframe>
 
   <div class="overlay"></div>
   <div class="corner-deco">&#10022; &nbsp; &#10022; &nbsp; &#10022;</div>
@@ -106,13 +98,18 @@
 
   <script>
     function updateClock() {
-      const now = new Date();
-      const h = String(now.getHours()).padStart(2, '0');
-      const m = String(now.getMinutes()).padStart(2, '0');
-      document.getElementById('clock').textContent = h + ':' + m;
+      try {
+        const now = new Date();
+        const h = now.getHours();
+        const m = now.getMinutes();
+        if (!isNaN(h) && !isNaN(m)) {
+          document.getElementById('clock').textContent =
+            (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+        }
+      } catch(e) {}
     }
     updateClock();
-    setInterval(updateClock, 10000);
+    setInterval(updateClock, 1000);
 
     function changeRadio(url, name) {
       document.getElementById('radio-label').textContent = name + ' – Élő adás';
@@ -122,16 +119,17 @@
     function startAll() {
       document.getElementById('start-overlay').style.display = 'none';
 
-      // Cloudinary embed URL – ez a Cloudinary saját videólejátszója
-      // loop=true, autoplay=true, muted=true paraméterekkel
-      // A TV ezt egy külső weboldalnak látja, nem saját video elemnek
-      document.getElementById('video-frame').src =
-        'https://player.cloudinary.com/embed/?public_id=Godo_Cukraszda_Bemutato1_uf6vhy&cloud_name=dekyvz2kj&player[autoplay]=true&player[loop]=true&player[muted]=true&player[controls]=false';
+      // Videó indítása – muted, ezért a TV biztosan elengedi
+      const video = document.getElementById('main-video');
+      video.play().catch(function() {
+        video.muted = true;
+        video.play();
+      });
 
-      // Rádió – 1 mp késéssel
+      // Rádió iframe – 2 mp késéssel, hogy a videó már fusson
       setTimeout(function() {
         document.getElementById('radio-frame').src = 'https://myonlineradio.hu/radio-1';
-      }, 1000);
+      }, 2000);
     }
   </script>
 
