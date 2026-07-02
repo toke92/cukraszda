@@ -8,27 +8,9 @@
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@300;400&display=swap');
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #1a0a00; font-family: 'Lato', sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
-
-    #main-video {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      z-index: 0;
-    }
-
-    /* Rádió – myonlineradio.hu iframe, teljesen láthatatlan */
-    #radio-frame {
-      position: fixed;
-      width: 1px; height: 1px;
-      top: -10px; left: -10px;
-      border: none; opacity: 0;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    .overlay { position: fixed; inset: 0; z-index: 1; pointer-events: none; background: linear-gradient(to bottom, rgba(20,8,0,0.3) 0%, rgba(20,8,0,0.0) 35%, rgba(20,8,0,0.0) 65%, rgba(20,8,0,0.6) 100%); }
+    #main-video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+    #radio-frame { position: fixed; width: 100%; height: 40px; bottom: 0; left: 0; border: none; opacity: 0.01; z-index: 2; }
+    .overlay { position: fixed; inset: 0; z-index: 3; pointer-events: none; background: linear-gradient(to bottom, rgba(20,8,0,0.3) 0%, rgba(20,8,0,0.0) 35%, rgba(20,8,0,0.0) 65%, rgba(20,8,0,0.6) 100%); }
     .top-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 18px 40px; }
     .logo { display: flex; flex-direction: column; line-height: 1; }
     .logo-main { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; color: #f5e6c8; letter-spacing: 0.04em; text-shadow: 0 2px 12px rgba(0,0,0,0.8); }
@@ -58,12 +40,11 @@
     <button id="start-btn" onclick="startAll()">&#9654; &nbsp; Indítás</button>
   </div>
 
-  <!-- Videó: közvetlen video tag, muted, loop -->
   <video id="main-video" playsinline loop muted preload="auto">
     <source src="https://res.cloudinary.com/dekyvz2kj/video/upload/v1781293765/Godo_Cukraszda_Bemutato1_uf6vhy.mp4" type="video/mp4">
   </video>
 
-  <!-- Rádió: myonlineradio.hu iframe-ben, láthatatlanul -->
+  <!-- Rádió – saját radio.html, közvetlen stream, semmi extra -->
   <iframe id="radio-frame" src="about:blank" allow="autoplay" scrolling="no"></iframe>
 
   <div class="overlay"></div>
@@ -80,13 +61,13 @@
         <span class="radio-label" id="radio-label">Rádió 1 – Élő adás</span>
       </div>
       <select id="radio-select" onchange="changeRadio(this.value, this.options[this.selectedIndex].text)">
-        <option value="https://myonlineradio.hu/radio-1">Rádió 1</option>
-        <option value="https://myonlineradio.hu/sunshine-radio">Sunshine Rádió</option>
-        <option value="https://myonlineradio.hu/juventus-radio">Juventus Rádió</option>
-        <option value="https://myonlineradio.hu/danubius-radio">Danubius Rádió</option>
-        <option value="https://myonlineradio.hu/megadance-radio">MegaDance Rádió</option>
-        <option value="https://myonlineradio.hu/retro-radio">Retro Rádió</option>
-        <option value="https://myonlineradio.hu/deja-vu-radio">Déjà Vu Rádió</option>
+        <option value="radio-1">Rádió 1</option>
+        <option value="sunshine">Sunshine Rádió</option>
+        <option value="juventus">Juventus Rádió</option>
+        <option value="danubius">Danubius Rádió</option>
+        <option value="megadance">MegaDance Rádió</option>
+        <option value="retro">Retro Rádió</option>
+        <option value="dejavu">Déjà Vu Rádió</option>
       </select>
     </div>
   </div>
@@ -99,9 +80,9 @@
   <script>
     function updateClock() {
       try {
-        const now = new Date();
-        const h = now.getHours();
-        const m = now.getMinutes();
+        var now = new Date();
+        var h = now.getHours();
+        var m = now.getMinutes();
         if (!isNaN(h) && !isNaN(m)) {
           document.getElementById('clock').textContent =
             (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
@@ -111,24 +92,28 @@
     updateClock();
     setInterval(updateClock, 1000);
 
-    function changeRadio(url, name) {
+    function changeRadio(key, name) {
       document.getElementById('radio-label').textContent = name + ' – Élő adás';
-      document.getElementById('radio-frame').src = url;
+      // Üzenet küldése a radio.html iframe-nek
+      var frame = document.getElementById('radio-frame');
+      if (frame.contentWindow) {
+        frame.contentWindow.postMessage(key, '*');
+      }
     }
 
     function startAll() {
       document.getElementById('start-overlay').style.display = 'none';
 
-      // Videó indítása – muted, ezért a TV biztosan elengedi
-      const video = document.getElementById('main-video');
+      // Videó indítása
+      var video = document.getElementById('main-video');
       video.play().catch(function() {
         video.muted = true;
         video.play();
       });
 
-      // Rádió iframe – 2 mp késéssel, hogy a videó már fusson
+      // Rádió – saját radio.html betöltése, hash-el jelzi melyik rádió kell
       setTimeout(function() {
-        document.getElementById('radio-frame').src = 'https://myonlineradio.hu/radio-1';
+        document.getElementById('radio-frame').src = 'radio.html#radio-1';
       }, 2000);
     }
   </script>
