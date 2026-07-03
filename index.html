@@ -9,7 +9,7 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #1a0a00; font-family: 'Lato', sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
     #main-video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
-    #radio-frame { position: fixed; width: 100%; height: 40px; bottom: 0; left: 0; border: none; opacity: 0.01; z-index: 2; }
+    #radio-audio { display: none; }
     .overlay { position: fixed; inset: 0; z-index: 3; pointer-events: none; background: linear-gradient(to bottom, rgba(20,8,0,0.3) 0%, rgba(20,8,0,0.0) 35%, rgba(20,8,0,0.0) 65%, rgba(20,8,0,0.6) 100%); }
     .top-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 18px 40px; }
     .logo { display: flex; flex-direction: column; line-height: 1; }
@@ -44,8 +44,10 @@
     <source src="https://res.cloudinary.com/dekyvz2kj/video/upload/v1781293765/Godo_Cukraszda_Bemutato1_uf6vhy.mp4" type="video/mp4">
   </video>
 
-  <!-- Rádió – saját radio.html, közvetlen stream, semmi extra -->
-  <iframe id="radio-frame" src="about:blank" allow="autoplay" scrolling="no"></iframe>
+  <!-- Rádió: muted autoplay – a TV engedi, majd Indításkor unmute -->
+  <audio id="radio-audio" muted autoplay preload="auto"
+    src="https://icast.connectmedia.hu/5202/live.mp3">
+  </audio>
 
   <div class="overlay"></div>
   <div class="corner-deco">&#10022; &nbsp; &#10022; &nbsp; &#10022;</div>
@@ -61,13 +63,13 @@
         <span class="radio-label" id="radio-label">Rádió 1 – Élő adás</span>
       </div>
       <select id="radio-select" onchange="changeRadio(this.value, this.options[this.selectedIndex].text)">
-        <option value="radio-1">Rádió 1</option>
-        <option value="sunshine">Sunshine Rádió</option>
-        <option value="juventus">Juventus Rádió</option>
-        <option value="danubius">Danubius Rádió</option>
-        <option value="megadance">MegaDance Rádió</option>
-        <option value="retro">Retro Rádió</option>
-        <option value="dejavu">Déjà Vu Rádió</option>
+        <option value="https://icast.connectmedia.hu/5202/live.mp3">Rádió 1</option>
+        <option value="https://sunshine1.stream.composeit.hu/sunshine">Sunshine Rádió</option>
+        <option value="https://youventusradio.hu/stream_192k">Juventus Rádió</option>
+        <option value="https://danubiusradio.hu/live.mp3">Danubius Rádió</option>
+        <option value="https://gamershouse.hu/livemega.mp3">MegaDance Rádió</option>
+        <option value="https://icast.connectmedia.hu/5001/live.mp3">Retro Rádió</option>
+        <option value="https://adas.dejavuradio.hu:8178/dejavuradio">Déjà Vu Rádió</option>
       </select>
     </div>
   </div>
@@ -92,13 +94,14 @@
     updateClock();
     setInterval(updateClock, 1000);
 
-    function changeRadio(key, name) {
+    var radio = document.getElementById('radio-audio');
+
+    function changeRadio(url, name) {
       document.getElementById('radio-label').textContent = name + ' – Élő adás';
-      // Üzenet küldése a radio.html iframe-nek
-      var frame = document.getElementById('radio-frame');
-      if (frame.contentWindow) {
-        frame.contentWindow.postMessage(key, '*');
-      }
+      radio.src = url;
+      radio.muted = false;
+      radio.load();
+      radio.play().catch(function() {});
     }
 
     function startAll() {
@@ -106,15 +109,19 @@
 
       // Videó indítása
       var video = document.getElementById('main-video');
-      video.play().catch(function() {
-        video.muted = true;
-        video.play();
-      });
+      video.play().catch(function() {});
 
-      // Rádió – saját radio.html betöltése, hash-el jelzi melyik rádió kell
-      setTimeout(function() {
-        document.getElementById('radio-frame').src = 'radio.html#radio-1';
-      }, 2000);
+      // Rádió: már tölt muted autoplay-jel, most csak unmute
+      radio.muted = false;
+      radio.play().catch(function() {});
+
+      // Ha megszakad, újraindítja
+      radio.addEventListener('error', function() {
+        setTimeout(function() { radio.load(); radio.play().catch(function(){}); }, 3000);
+      });
+      radio.addEventListener('stalled', function() {
+        setTimeout(function() { radio.load(); radio.play().catch(function(){}); }, 3000);
+      });
     }
   </script>
 
