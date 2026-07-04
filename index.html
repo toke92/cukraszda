@@ -46,7 +46,7 @@
 
   <!-- Rádió: muted autoplay – a TV engedi, majd Indításkor unmute -->
   <audio id="radio-audio" muted autoplay preload="auto"
-    src="https://icast.connectmedia.hu/5202/live.mp3">
+    src="http://stream2.radio1.hu:8000/mid.mp3">
   </audio>
 
   <div class="overlay"></div>
@@ -63,7 +63,7 @@
         <span class="radio-label" id="radio-label">Rádió 1 – Élő adás</span>
       </div>
       <select id="radio-select" onchange="changeRadio(this.value, this.options[this.selectedIndex].text)">
-        <option value="https://icast.connectmedia.hu/5202/live.mp3">Rádió 1</option>
+        <option value="http://stream2.radio1.hu:8000/mid.mp3">Rádió 1</option>
         <option value="https://sunshine1.stream.composeit.hu/sunshine">Sunshine Rádió</option>
         <option value="https://youventusradio.hu/stream_192k">Juventus Rádió</option>
         <option value="https://danubiusradio.hu/live.mp3">Danubius Rádió</option>
@@ -95,6 +95,11 @@
     setInterval(updateClock, 1000);
 
     var radio = document.getElementById('radio-audio');
+    var radio1urls = [
+      'http://stream2.radio1.hu:8000/mid.mp3',
+      'https://icast.connectmedia.hu/5202/live.mp3'
+    ];
+    var radio1idx = 0;
 
     function changeRadio(url, name) {
       document.getElementById('radio-label').textContent = name + ' – Élő adás';
@@ -111,16 +116,24 @@
       var video = document.getElementById('main-video');
       video.play().catch(function() {});
 
-      // Rádió: már tölt muted autoplay-jel, most csak unmute
+      // Rádió: unmute
       radio.muted = false;
       radio.play().catch(function() {});
 
-      // Ha megszakad, újraindítja
+      // Ha akadozik vagy hibás, próbálja a másik Rádió 1 URL-t
       radio.addEventListener('error', function() {
-        setTimeout(function() { radio.load(); radio.play().catch(function(){}); }, 3000);
+        radio1idx = (radio1idx + 1) % radio1urls.length;
+        radio.src = radio1urls[radio1idx];
+        radio.load();
+        setTimeout(function() { radio.play().catch(function(){}); }, 2000);
       });
       radio.addEventListener('stalled', function() {
-        setTimeout(function() { radio.load(); radio.play().catch(function(){}); }, 3000);
+        setTimeout(function() {
+          radio1idx = (radio1idx + 1) % radio1urls.length;
+          radio.src = radio1urls[radio1idx];
+          radio.load();
+          radio.play().catch(function(){});
+        }, 3000);
       });
     }
   </script>
