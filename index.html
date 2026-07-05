@@ -65,10 +65,8 @@
     scrolling="no">
   </iframe>
 
-  <!-- Rádió: muted autoplay, unmute gombnyomásra -->
-  <audio id="radio-audio" muted autoplay preload="auto"
-    src="https://icast.connectmedia.hu/5202/live.mp3">
-  </audio>
+  <!-- Rádió: JavaScript hozza létre dinamikusan, videó után -->
+  <!-- audio elem szándékosan nincs itt a HTML-ben -->
 
   <div class="overlay"></div>
   <div class="corner-deco">&#10022; &nbsp; &#10022; &nbsp; &#10022;</div>
@@ -116,7 +114,7 @@
     updateClock();
     setInterval(updateClock, 1000);
 
-    var radio = document.getElementById('radio-audio');
+    var radio = null;
     var dot = document.getElementById('radio-dot');
     var statusEl = document.getElementById('radio-status');
 
@@ -125,34 +123,34 @@
       statusEl.textContent = text;
     }
 
-    radio.addEventListener('waiting', function() { setStatus('loading', 'Tölt...'); });
-    radio.addEventListener('playing', function() { setStatus('playing', 'Élő adás'); });
-    radio.addEventListener('pause',   function() { setStatus('', 'Szünetel'); });
-    radio.addEventListener('error',   function() {
-      setStatus('error', 'Hiba – újraindítás...');
-      setTimeout(function() {
-        radio.load();
-        radio.muted = false;
-        radio.play().catch(function(){});
-      }, 4000);
-    });
+    function createRadio(url) {
+      // Ha már van, leállítjuk
+      if (radio) {
+        radio.pause();
+        radio.src = '';
+        document.body.removeChild(radio);
+        radio = null;
+      }
 
-    function changeRadio(url, name) {
-      document.getElementById('radio-label').textContent = name + ' – Élő adás';
-      setStatus('loading', 'Tölt...');
+      // Új audio elem létrehozása dinamikusan
+      radio = document.createElement('audio');
+      radio.style.display = 'none';
+      radio.preload = 'auto';
       radio.src = url;
-      radio.muted = false;
-      radio.load();
-      radio.play().catch(function() { setStatus('error', 'Nem indult el'); });
-    }
+      document.body.appendChild(radio);
 
-    function startAll() {
-      document.getElementById('start-overlay').style.display = 'none';
+      radio.addEventListener('waiting', function() { setStatus('loading', 'Tölt...'); });
+      radio.addEventListener('playing', function() { setStatus('playing', 'Élő adás'); });
+      radio.addEventListener('pause',   function() { setStatus('', 'Szünetel'); });
+      radio.addEventListener('error',   function() {
+        setStatus('error', 'Hiba – újraindítás...');
+        setTimeout(function() {
+          radio.load();
+          radio.play().catch(function(){});
+        }, 4000);
+      });
 
-      // Rádió unmute – közvetlenül a gombnyomás után
       setStatus('loading', 'Tölt...');
-      radio.muted = false;
-      radio.volume = 1.0;
       var p = radio.play();
       if (p !== undefined) {
         p.then(function() {
@@ -161,7 +159,22 @@
           setStatus('error', 'Hiba: ' + err.name);
         });
       }
-      // Videó iframe már autoplay-jel tölt, nem kell külön indítani
+    }
+
+    function changeRadio(url, name) {
+      document.getElementById('radio-label').textContent = name + ' – Élő adás';
+      createRadio(url);
+    }
+
+    function startAll() {
+      document.getElementById('start-overlay').style.display = 'none';
+      setStatus('loading', 'Videó tölt...');
+
+      // Videó iframe már autoplay-jel tölt
+      // Rádió csak 4 másodperccel később jön létre – amikor a videó már fut
+      setTimeout(function() {
+        createRadio('https://icast.connectmedia.hu/5202/live.mp3');
+      }, 4000);
     }
   </script>
 
