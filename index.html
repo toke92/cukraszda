@@ -129,22 +129,27 @@
     function startAll() {
       document.getElementById('start-overlay').style.display = 'none';
 
-      var video = document.getElementById('main-video');
-      video.play().catch(function() {});
-
+      // Előbb rádió unmute – közvetlenül a felhasználói interakció után
       setStatus('loading', 'Unmute...');
       radio.muted = false;
+      radio.volume = 1.0;
 
-      setStatus('loading', 'Play hívás...');
       var p = radio.play();
       if (p !== undefined) {
         p.then(function() {
           setStatus('loading', 'Play OK – hangot várom...');
+          // Videó csak utána indul
+          var video = document.getElementById('main-video');
+          video.play().catch(function() {});
         }).catch(function(err) {
           setStatus('error', 'Hiba: ' + err.name);
+          var video = document.getElementById('main-video');
+          video.play().catch(function() {});
         });
       } else {
         setStatus('loading', 'Régi API, várom...');
+        var video = document.getElementById('main-video');
+        video.play().catch(function() {});
       }
     }
   </script>
