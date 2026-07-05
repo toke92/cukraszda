@@ -57,8 +57,11 @@
     <button id="start-btn" onclick="startAll()">&#9654; &nbsp; Indítás</button>
   </div>
 
-  <!-- Videó: közvetlen video tag -->
-  <video id="main-video" playsinline loop muted preload="auto" style="position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;">
+  <!-- Videó: explicit jelezzük hogy nincs hangcsatornája -->
+  <video id="main-video" playsinline loop muted preload="auto"
+    disableremoteplayback
+    disablepictureinpicture
+    style="position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;">
     <source src="https://res.cloudinary.com/dekyvz2kj/video/upload/v1781293765/Godo_Cukraszda_Bemutato1_uf6vhy.mp4" type="video/mp4">
   </video>
 
@@ -167,14 +170,23 @@
       document.getElementById('start-overlay').style.display = 'none';
       setStatus('loading', 'Videó tölt...');
 
-      // Videó indítása – muted, TV biztosan elengedi
       var video = document.getElementById('main-video');
+
+      // Ha van audioTracks API, explicit kikapcsoljuk
+      video.addEventListener('loadedmetadata', function() {
+        if (video.audioTracks && video.audioTracks.length > 0) {
+          for (var i = 0; i < video.audioTracks.length; i++) {
+            video.audioTracks[i].enabled = false;
+          }
+        }
+      });
+
       video.play().catch(function() {});
 
-      // Rádió dinamikusan jön létre 4 mp után – videó már fut akkorra
+      // Rádió 6 mp után – videó biztosan fut már
       setTimeout(function() {
         createRadio('https://icast.connectmedia.hu/5202/live.mp3');
-      }, 4000);
+      }, 6000);
     }
   </script>
 
