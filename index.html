@@ -133,11 +133,20 @@
       var video = document.getElementById('main-video');
       video.play().catch(function() {});
 
-      setStatus('loading', 'Tölt...');
+      setStatus('loading', 'Unmute...');
       radio.muted = false;
-      radio.play().catch(function() {
-        setStatus('error', 'Nem indult el');
-      });
+
+      setStatus('loading', 'Play hívás...');
+      var p = radio.play();
+      if (p !== undefined) {
+        p.then(function() {
+          setStatus('loading', 'Play OK – hangot várom...');
+        }).catch(function(err) {
+          setStatus('error', 'Hiba: ' + err.name);
+        });
+      } else {
+        setStatus('loading', 'Régi API, várom...');
+      }
     }
   </script>
 
