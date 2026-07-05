@@ -110,7 +110,6 @@
 
     // Rádió események – státusz kijelzés
     radio.addEventListener('waiting',  function() { setStatus('loading', 'Tölt...'); });
-    radio.addEventListener('stalled',  function() { setStatus('loading', 'Tölt...'); setTimeout(function() { radio.load(); radio.muted = false; radio.play().catch(function(){}); }, 3000); });
     radio.addEventListener('playing',  function() { setStatus('playing', 'Élő adás'); });
     radio.addEventListener('pause',    function() { setStatus('', 'Szünetel'); });
     radio.addEventListener('error',    function() {
