@@ -57,13 +57,10 @@
     <button id="start-btn" onclick="startAll()">&#9654; &nbsp; Indítás</button>
   </div>
 
-  <!-- Videó: Cloudinary iframe – mint a másik TV-n ahol működött -->
-  <iframe id="video-frame"
-    src="https://player.cloudinary.com/embed/?public_id=Godo_Cukraszda_Bemutato1_uf6vhy&cloud_name=dekyvz2kj&player[autoplay]=true&player[loop]=true&player[muted]=true&player[controls]=false"
-    allowfullscreen
-    allow="autoplay; fullscreen"
-    scrolling="no">
-  </iframe>
+  <!-- Videó: közvetlen video tag -->
+  <video id="main-video" playsinline loop muted preload="auto" style="position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;">
+    <source src="https://res.cloudinary.com/dekyvz2kj/video/upload/v1781293765/Godo_Cukraszda_Bemutato1_uf6vhy.mp4" type="video/mp4">
+  </video>
 
   <!-- Rádió: JavaScript hozza létre dinamikusan, videó után -->
   <!-- audio elem szándékosan nincs itt a HTML-ben -->
@@ -170,8 +167,11 @@
       document.getElementById('start-overlay').style.display = 'none';
       setStatus('loading', 'Videó tölt...');
 
-      // Videó iframe már autoplay-jel tölt
-      // Rádió csak 4 másodperccel később jön létre – amikor a videó már fut
+      // Videó indítása – muted, TV biztosan elengedi
+      var video = document.getElementById('main-video');
+      video.play().catch(function() {});
+
+      // Rádió dinamikusan jön létre 4 mp után – videó már fut akkorra
       setTimeout(function() {
         createRadio('https://icast.connectmedia.hu/5202/live.mp3');
       }, 4000);
