@@ -8,8 +8,20 @@
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@300;400&display=swap');
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #1a0a00; font-family: 'Lato', sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
-    #main-video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+
+    /* Videó – Cloudinary iframe, mint a működő TV-n */
+    #video-frame {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      z-index: 0;
+    }
+
+    /* Rádió – muted autoplay, unmute gombnyomásra */
     #radio-audio { display: none; }
+
     .overlay { position: fixed; inset: 0; z-index: 3; pointer-events: none; background: linear-gradient(to bottom, rgba(20,8,0,0.3) 0%, rgba(20,8,0,0.0) 35%, rgba(20,8,0,0.0) 65%, rgba(20,8,0,0.6) 100%); }
     .top-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 18px 40px; }
     .logo { display: flex; flex-direction: column; line-height: 1; }
@@ -17,7 +29,7 @@
     .logo-sub { font-size: 0.85rem; font-weight: 300; color: #d4a96a; letter-spacing: 0.25em; text-transform: uppercase; margin-top: 3px; }
     .radio-area { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
     .radio-badge { display: flex; align-items: center; gap: 10px; background: rgba(20,8,0,0.6); border: 1px solid rgba(212,169,106,0.4); border-radius: 40px; padding: 8px 18px; }
-    .radio-dot { width: 9px; height: 9px; border-radius: 50%; border-radius: 50%; background: #888; }
+    .radio-dot { width: 9px; height: 9px; border-radius: 50%; background: #888; }
     .radio-dot.loading { background: #d4a96a; animation: blink 0.8s ease-in-out infinite; }
     .radio-dot.playing { background: #4caf50; animation: pulse 1.8s ease-in-out infinite; }
     .radio-dot.error { background: #e53935; animation: none; }
@@ -45,10 +57,15 @@
     <button id="start-btn" onclick="startAll()">&#9654; &nbsp; Indítás</button>
   </div>
 
-  <video id="main-video" playsinline loop muted preload="auto">
-    <source src="https://res.cloudinary.com/dekyvz2kj/video/upload/v1781293765/Godo_Cukraszda_Bemutato1_uf6vhy.mp4" type="video/mp4">
-  </video>
+  <!-- Videó: Cloudinary iframe – mint a másik TV-n ahol működött -->
+  <iframe id="video-frame"
+    src="https://player.cloudinary.com/embed/?public_id=Godo_Cukraszda_Bemutato1_uf6vhy&cloud_name=dekyvz2kj&player[autoplay]=true&player[loop]=true&player[muted]=true&player[controls]=false"
+    allowfullscreen
+    allow="autoplay; fullscreen"
+    scrolling="no">
+  </iframe>
 
+  <!-- Rádió: muted autoplay, unmute gombnyomásra -->
   <audio id="radio-audio" muted autoplay preload="auto"
     src="https://icast.connectmedia.hu/5202/live.mp3">
   </audio>
@@ -108,13 +125,16 @@
       statusEl.textContent = text;
     }
 
-    // Rádió események – státusz kijelzés
-    radio.addEventListener('waiting',  function() { setStatus('loading', 'Tölt...'); });
-    radio.addEventListener('playing',  function() { setStatus('playing', 'Élő adás'); });
-    radio.addEventListener('pause',    function() { setStatus('', 'Szünetel'); });
-    radio.addEventListener('error',    function() {
+    radio.addEventListener('waiting', function() { setStatus('loading', 'Tölt...'); });
+    radio.addEventListener('playing', function() { setStatus('playing', 'Élő adás'); });
+    radio.addEventListener('pause',   function() { setStatus('', 'Szünetel'); });
+    radio.addEventListener('error',   function() {
       setStatus('error', 'Hiba – újraindítás...');
-      setTimeout(function() { radio.load(); radio.muted = false; radio.play().catch(function(){}); }, 4000);
+      setTimeout(function() {
+        radio.load();
+        radio.muted = false;
+        radio.play().catch(function(){});
+      }, 4000);
     });
 
     function changeRadio(url, name) {
@@ -129,28 +149,19 @@
     function startAll() {
       document.getElementById('start-overlay').style.display = 'none';
 
-      // Előbb rádió unmute – közvetlenül a felhasználói interakció után
-      setStatus('loading', 'Unmute...');
+      // Rádió unmute – közvetlenül a gombnyomás után
+      setStatus('loading', 'Tölt...');
       radio.muted = false;
       radio.volume = 1.0;
-
       var p = radio.play();
       if (p !== undefined) {
         p.then(function() {
           setStatus('loading', 'Play OK – hangot várom...');
-          // Videó csak utána indul
-          var video = document.getElementById('main-video');
-          video.play().catch(function() {});
         }).catch(function(err) {
           setStatus('error', 'Hiba: ' + err.name);
-          var video = document.getElementById('main-video');
-          video.play().catch(function() {});
         });
-      } else {
-        setStatus('loading', 'Régi API, várom...');
-        var video = document.getElementById('main-video');
-        video.play().catch(function() {});
       }
+      // Videó iframe már autoplay-jel tölt, nem kell külön indítani
     }
   </script>
 
