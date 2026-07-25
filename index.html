@@ -9,18 +9,18 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #1a0a00; font-family: 'Lato', sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
 
-    /* Videó – Cloudinary iframe, mint a működő TV-n */
-    #video-frame {
+    /* Canvas a videó helyett – ez nem media element az OS szemében */
+    #video-canvas {
       position: fixed;
       inset: 0;
       width: 100%;
       height: 100%;
-      border: none;
       z-index: 0;
+      background: black;
     }
 
-    /* Rádió – muted autoplay, unmute gombnyomásra */
-    #radio-audio { display: none; }
+    /* Rejtett videó elem a háttérben */
+    #hidden-video { display: none; }
 
     .overlay { position: fixed; inset: 0; z-index: 3; pointer-events: none; background: linear-gradient(to bottom, rgba(20,8,0,0.3) 0%, rgba(20,8,0,0.0) 35%, rgba(20,8,0,0.0) 65%, rgba(20,8,0,0.6) 100%); }
     .top-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 18px 40px; }
@@ -57,16 +57,10 @@
     <button id="start-btn" onclick="startAll()">&#9654; &nbsp; Indítás</button>
   </div>
 
-  <!-- Videó: explicit jelezzük hogy nincs hangcsatornája -->
-  <video id="main-video" playsinline loop muted preload="auto"
-    disableremoteplayback
-    disablepictureinpicture
-    style="position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;">
+  <canvas id="video-canvas"></canvas>
+  <video id="hidden-video" playsinline loop muted preload="auto">
     <source src="https://res.cloudinary.com/dekyvz2kj/video/upload/v1781293765/Godo_Cukraszda_Bemutato1_uf6vhy.mp4" type="video/mp4">
   </video>
-
-  <!-- Rádió: JavaScript hozza létre dinamikusan, videó után -->
-  <!-- audio elem szándékosan nincs itt a HTML-ben -->
 
   <div class="overlay"></div>
   <div class="corner-deco">&#10022; &nbsp; &#10022; &nbsp; &#10022;</div>
@@ -117,6 +111,9 @@
     var radio = null;
     var dot = document.getElementById('radio-dot');
     var statusEl = document.getElementById('radio-status');
+    var canvas = document.getElementById('video-canvas');
+    var ctx = canvas.getContext('2d');
+    var video = document.getElementById('hidden-video');
 
     function setStatus(state, text) {
       dot.className = 'radio-dot ' + state;
@@ -124,15 +121,13 @@
     }
 
     function createRadio(url) {
-      // Ha már van, leállítjuk
       if (radio) {
         radio.pause();
         radio.src = '';
-        document.body.removeChild(radio);
+        if (radio.parentNode) radio.parentNode.removeChild(radio);
         radio = null;
       }
 
-      // Új audio elem létrehozása dinamikusan
       radio = document.createElement('audio');
       radio.style.display = 'none';
       radio.preload = 'auto';
@@ -145,12 +140,14 @@
       radio.addEventListener('error',   function() {
         setStatus('error', 'Hiba – újraindítás...');
         setTimeout(function() {
-          radio.load();
-          radio.play().catch(function(){});
+          if (radio) {
+            radio.load();
+            radio.play().catch(function(){});
+          }
         }, 4000);
       });
 
-      setStatus('loading', 'Tölt....');
+      setStatus('loading', 'Tölt...');
       var p = radio.play();
       if (p !== undefined) {
         p.then(function() {
@@ -168,25 +165,34 @@
 
     function startAll() {
       document.getElementById('start-overlay').style.display = 'none';
-      setStatus('loading', 'Videó tölt...');
-
-      var video = document.getElementById('main-video');
-
-      // Ha van audioTracks API, explicit kikapcsoljuk
-      video.addEventListener('loadedmetadata', function() {
-        if (video.audioTracks && video.audioTracks.length > 0) {
-          for (var i = 0; i < video.audioTracks.length; i++) {
-            video.audioTracks[i].enabled = false;
-          }
-        }
-      });
-
+      
+      // Videó indítása (rejtett, némított)
       video.play().catch(function() {});
 
-      // Rádió 6 mp után – videó biztosan fut már
+      // Canvas renderelés indítása
+      video.addEventListener('loadedmetadata', function() {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+      });
+      
+      // Biztonsági beállítás ha a loadedmetadata már lefutott
+      if (video.videoWidth) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+      }
+
+      function render() {
+        if (!video.paused && !video.ended) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        }
+        requestAnimationFrame(render);
+      }
+      render();
+
+      // Rádió indítása
       setTimeout(function() {
         createRadio('https://icast.connectmedia.hu/5202/live.mp3');
-      }, 6000);
+      }, 1000);
     }
   </script>
 
