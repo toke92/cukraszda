@@ -10,12 +10,13 @@
   var diagnostics = document.getElementById('diagnostics');
   var index = 0, nextImage = null, wanted = false, retry = null;
   var attempts = 0, generation = 0, lastProgress = 0, lastTime = -1;
+  var healthySince = 0;
   var lines = [], slideTimer = null;
 
   function log(text) {
     lines.push(new Date().toLocaleTimeString() + ' ' + text);
     if (lines.length > 12) { lines.shift(); }
-    diagnostics.textContent = navigator.userAgent + '\nMP3: ' + radio.canPlayType('audio/mpeg') + '\n' + lines.join('\n');
+    diagnostics.textContent = 'Verzió: 2026-09-22\n' + navigator.userAgent + '\nMP3: ' + radio.canPlayType('audio/mpeg') + '\n' + lines.join('\n');
   }
   function message(text) { status.textContent = text; log(text); }
   function imageError(text) {
@@ -50,23 +51,32 @@
 
   function showMenu() { panel.className = ''; }
   function cancelRetry() { if (retry) { clearTimeout(retry); retry = null; } }
+  function trackProgress() {
+    var time = radio.currentTime, now = Date.now();
+    if (!wanted || radio.paused || radio.ended || !isFinite(time)) { return; }
+    if (time > 0 && time > lastTime + 0.01) {
+      if (!healthySince || now - lastProgress > 10000) { healthySince = now; }
+      lastTime = time; lastProgress = now;
+      if (retry) {
+        cancelRetry();
+        message('A rádiólejátszás folytatódott.');
+      }
+      if (now - healthySince > 30000) { attempts = 0; }
+    }
+  }
   function failed(text) {
     if (!wanted || retry) { return; }
-    showMenu();
-    if (attempts >= 3) {
-      wanted = false;
-      radio.pause();
-      message(text + ' Válassz másik rádiót, vagy nyomd meg az Indítást.');
-      return;
-    }
     attempts += 1;
-    message(text + ' Újrapróbálás 5 másodperc múlva (' + attempts + '/3).');
-    retry = setTimeout(function () { retry = null; connect(); }, 5000);
+    healthySince = 0;
+    var delay = Math.min(60000, 5000 * Math.pow(2, Math.min(attempts - 1, 4)));
+    message(text + ' Újrapróbálás ' + delay / 1000 + ' másodperc múlva (' + attempts + ').');
+    // Preserve the user's menu visibility. Radio recovery runs in the background.
+    retry = setTimeout(function () { retry = null; if (wanted) { connect(); } }, delay);
   }
   function connect() {
     cancelRetry();
     var token = ++generation;
-    lastProgress = Date.now(); lastTime = -1;
+    lastProgress = Date.now(); lastTime = -1; healthySince = 0;
     radio.src = station.value;
     radio.load();
     message('Kapcsolódás: ' + station.options[station.selectedIndex].text);
@@ -76,7 +86,8 @@
         result.then(function () {}, function (error) {
           if (token !== generation || !wanted) { return; }
           if (error.name === 'NotAllowedError') {
-            wanted = false; cancelRetry(); showMenu();
+            wanted = false; cancelRetry();
+            document.getElementById('menu').textContent = 'Rádió indítása / Menü';
             message('A TV indítást kér: nyomd meg az Indítás gombot.');
           } else { failed('Nem indult el a rádió: ' + error.name); }
         });
@@ -84,6 +95,7 @@
     } catch (error) { failed('Lejátszási hiba: ' + error.message); }
   }
   function start() {
+    document.getElementById('menu').textContent = 'Rádió / Menü';
     wanted = true; attempts = 0; connect();
   }
   document.getElementById('start').onclick = start;
@@ -98,16 +110,9 @@
   };
   radio.addEventListener('playing', function () {
     if (!wanted) { radio.pause(); return; }
-    cancelRetry(); lastProgress = Date.now();
     message('Lejátszás: ' + station.options[station.selectedIndex].text);
   });
-  radio.addEventListener('timeupdate', function () {
-    if (radio.currentTime !== lastTime) {
-      lastTime = radio.currentTime; lastProgress = Date.now();
-      // Reset retries only after actual playback, not just a playing event.
-      if (radio.currentTime > 10) { attempts = 0; }
-    }
-  });
+  radio.addEventListener('timeupdate', trackProgress);
   radio.addEventListener('error', function () {
     var code = radio.error ? radio.error.code : '?';
     failed('Rádióhiba (' + code + '): a cím, kapcsolat vagy formátum nem elérhető.');
@@ -115,8 +120,12 @@
   radio.addEventListener('ended', function () { failed('A rádiókapcsolat lezárult.'); });
   radio.addEventListener('waiting', function () { if (wanted) { message('Rádió pufferelése…'); } });
   setInterval(function () {
-    if (wanted && !retry && Date.now() - lastProgress > 25000) {
-      failed('25 másodperce nem halad a rádiólejátszás.');
+    // Some TV browsers deliver timeupdate unreliably. Read the clock directly,
+    // and let short buffering recover without discarding the current connection.
+    trackProgress();
+    if (wanted && !retry && Date.now() - lastProgress > 45000) {
+      log('readyState=' + radio.readyState + ', networkState=' + radio.networkState + ', currentTime=' + radio.currentTime);
+      failed('45 másodperce nem halad a rádiólejátszás.');
     }
   }, 5000);
   document.getElementById('hide').onclick = function () {
